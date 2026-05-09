@@ -1,3 +1,4 @@
+import logger from '../core/logger';
 import { BaseDetector } from '../core/detector.interface';
 import { PluginManifest, DetectorConfig } from '../core/types';
 import * as fs from 'fs';
@@ -15,7 +16,7 @@ export class PluginLoader {
     const detectors: BaseDetector[] = [];
     
     if (!fs.existsSync(this.pluginsDir)) {
-      console.log(`Plugins directory ${this.pluginsDir} does not exist`);
+      logger.info(`Plugins directory ${this.pluginsDir} does not exist`);
       return detectors;
     }
 
@@ -28,7 +29,7 @@ export class PluginLoader {
         const pluginDetectors = await this.loadPlugin(pluginDir);
         detectors.push(...pluginDetectors);
       } catch (error) {
-        console.error(`Failed to load plugin ${pluginDir}:`, error);
+        logger.error(`Failed to load plugin ${pluginDir}:`, error);
       }
     }
 
@@ -47,7 +48,7 @@ export class PluginLoader {
       fs.readFileSync(manifestPath, 'utf8')
     );
 
-    console.log(`Loading plugin: ${manifest.name} v${manifest.version}`);
+    logger.info(`Loading plugin: ${manifest.name} v${manifest.version}`);
 
     const detectors: BaseDetector[] = [];
     
@@ -63,7 +64,7 @@ export class PluginLoader {
           });
         }
       } catch (error) {
-        console.error(`Failed to load detector ${detectorConfig.name}:`, error);
+        logger.error(`Failed to load detector ${detectorConfig.name}:`, error);
       }
     }
 
@@ -76,7 +77,7 @@ export class PluginLoader {
       const detectorFile = path.join(pluginPath, `${config.id}.js`);
       
       if (!fs.existsSync(detectorFile)) {
-        console.warn(`Detector file not found: ${detectorFile}`);
+        logger.warn(`Detector file not found: ${detectorFile}`);
         return null;
       }
 
@@ -90,7 +91,7 @@ export class PluginLoader {
 
       return new DetectorClass(config);
     } catch (error) {
-      console.error(`Failed to load detector from ${pluginPath}:`, error);
+      logger.error(`Failed to load detector from ${pluginPath}:`, error);
       return null;
     }
   }
@@ -111,7 +112,7 @@ export class PluginLoader {
     const pluginInfo = this.loadedPlugins.get(pluginName);
     if (pluginInfo) {
       this.loadedPlugins.delete(pluginName);
-      console.log(`Unloaded plugin: ${pluginName}`);
+      logger.info(`Unloaded plugin: ${pluginName}`);
     }
   }
 
@@ -120,13 +121,13 @@ export class PluginLoader {
     
     for (const field of required) {
       if (!manifest[field as keyof PluginManifest]) {
-        console.error(`Missing required field in manifest: ${field}`);
+        logger.error(`Missing required field in manifest: ${field}`);
         return false;
       }
     }
 
     if (!Array.isArray(manifest.detectors) || manifest.detectors.length === 0) {
-      console.error('Manifest must contain at least one detector');
+      logger.error('Manifest must contain at least one detector');
       return false;
     }
 
@@ -167,7 +168,7 @@ export class PluginLoader {
       detectorTemplate
     );
 
-    console.log(`Plugin template created at: ${pluginDir}`);
+    logger.info(`Plugin template created at: ${pluginDir}`);
   }
 
   private generateDetectorTemplate(pluginName: string): string {

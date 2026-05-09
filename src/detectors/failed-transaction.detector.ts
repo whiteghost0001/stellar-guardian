@@ -1,7 +1,10 @@
+import logger from '../core/logger';
 import { BaseDetector } from '../core/detector.interface';
 import { StellarEvent, DetectionResult, DetectorConfig } from '../core/types';
 
 export class FailedTransactionDetector extends BaseDetector {
+  private consecutiveFailures: Map<string, number> = new Map();
+
   constructor(config?: Partial<DetectorConfig>) {
     super({
       id: 'failed-transaction-detector',
@@ -9,7 +12,7 @@ export class FailedTransactionDetector extends BaseDetector {
       description: 'Detects failed transactions and contract calls',
       enabled: true,
       parameters: {
-        alertOnConsecutiveFailures: 3,
+        alertOnConsecutiveFailures: Number(process.env.FAILED_TX_CONSECUTIVE_THRESHOLD) || 3,
         monitorSpecificContracts: [],
         ...config?.parameters
       },
@@ -19,21 +22,39 @@ export class FailedTransactionDetector extends BaseDetector {
 
   async detect(event: StellarEvent): Promise<DetectionResult | null> {
     try {
-      if (event.eventType !== 'transaction_failed' && 
-          !this.isContractInvocationFailure(event)) {
+      const isFailed =
+        event.eventType === 'transaction_failed' ||
+        this.isContractInvocationFailure(event);
+
+      if (!isFailed) {
+        // Reset consecutive counter on success
+        if (
+          event.eventType === 'contract_invocation' &&
+          event.eventData?.status === 'success'
+        ) {
+          this.consecutiveFailures.set(event.contractId, 0);
+        }
         return null;
       }
 
-      const severity = this.calculateSeverity(event);
-      
+      const count = (this.consecutiveFailures.get(event.contractId) ?? 0) + 1;
+      this.consecutiveFailures.set(event.contractId, count);
+
+      const threshold = this.config.parameters.alertOnConsecutiveFailures;
+      if (count < threshold) return null;
+
+      // Reset after alerting
+      this.consecutiveFailures.set(event.contractId, 0);
+
       return {
         isMatch: true,
-        severity,
+        severity: this.calculateSeverity(event),
         title: 'Failed Transaction',
-        description: this.generateDescription(event),
+        description: this.generateDescription(event, count),
         metadata: {
           contractId: event.contractId,
           transactionId: event.transactionId,
+          consecutiveFailures: count,
           errorCode: event.eventData?.error_code,
           errorMessage: event.eventData?.error_message,
           gasUsed: event.eventData?.gas_used,
@@ -41,52 +62,35 @@ export class FailedTransactionDetector extends BaseDetector {
         }
       };
     } catch (error) {
-      console.error(`Error processing event: ${error}`);
+      logger.error(`Error processing event: ${error}`);
       return null;
     }
   }
 
   private isContractInvocationFailure(event: StellarEvent): boolean {
-    return event.eventType === 'contract_invocation' && 
-           event.eventData?.status === 'failed';
+    return (
+      event.eventType === 'contract_invocation' &&
+      event.eventData?.status === 'failed'
+    );
   }
 
   private calculateSeverity(event: StellarEvent): 'LOW' | 'MEDIUM' | 'HIGH' | 'CRITICAL' {
     const errorCode = event.eventData?.error_code;
     const gasUsed = event.eventData?.gas_used || 0;
-    
-    // TODO: add more sophisticated error classification
-    if (errorCode === 'OUT_OF_GAS' || errorCode?.startsWith('SYSTEM_')) {
-      return 'CRITICAL';
-    }
-    
-    if (errorCode === 'CONTRACT_PANIC' || errorCode === 'RUNTIME_ERROR') {
-      return 'HIGH';
-    }
-    
-    if (gasUsed > 1000000) {
-      return 'MEDIUM';
-    }
-    
+
+    if (errorCode === 'OUT_OF_GAS' || errorCode?.startsWith('SYSTEM_')) return 'CRITICAL';
+    if (errorCode === 'CONTRACT_PANIC' || errorCode === 'RUNTIME_ERROR') return 'HIGH';
+    if (gasUsed > 1000000) return 'MEDIUM';
     return 'LOW';
   }
 
-  private generateDescription(event: StellarEvent): string {
+  private generateDescription(event: StellarEvent, count: number): string {
     const errorCode = event.eventData?.error_code || 'UNKNOWN';
     const errorMessage = event.eventData?.error_message || 'No error message';
-    
-    return `Transaction ${event.transactionId} failed: ${errorCode} - ${errorMessage}`;
+    return `Transaction ${event.transactionId} failed (${count} consecutive): ${errorCode} - ${errorMessage}`;
   }
 
-  getName(): string {
-    return this.config.name;
-  }
-
-  getDescription(): string {
-    return this.config.description;
-  }
-
-  getVersion(): string {
-    return '1.0.0';
-  }
+  getName(): string { return this.config.name; }
+  getDescription(): string { return this.config.description; }
+  getVersion(): string { return '1.0.0'; }
 }

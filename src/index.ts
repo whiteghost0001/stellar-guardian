@@ -8,6 +8,7 @@ import { PluginLoader } from './plugins/plugin-loader';
 import { WhaleTransferDetector } from './detectors/whale-transfer.detector';
 import { FailedTransactionDetector } from './detectors/failed-transaction.detector';
 import { createDashboardAPI } from './dashboard/api';
+import logger from './core/logger';
 import dotenv from 'dotenv';
 
 dotenv.config();
@@ -35,7 +36,7 @@ class StellarGuardian {
   }
 
   async initialize(): Promise<void> {
-    console.log('Initializing Stellar Guardian...');
+    logger.info('Initializing Stellar Guardian...');
 
     this.app.use(express.json());
     this.app.use('/api', createDashboardAPI(this.prisma, this.riskEngine));
@@ -44,11 +45,11 @@ class StellarGuardian {
     await this.loadPluginDetectors();
     this.setupEventListeners();
 
-    console.log('Stellar Guardian initialized');
+    logger.info('Stellar Guardian initialized');
   }
 
   private async loadBuiltInDetectors(): Promise<void> {
-    console.log('Loading built-in detectors...');
+    logger.info('Loading built-in detectors...');
     
     const whaleDetector = new WhaleTransferDetector();
     const failedTxDetector = new FailedTransactionDetector();
@@ -56,11 +57,11 @@ class StellarGuardian {
     this.detectorEngine.addDetector(whaleDetector);
     this.detectorEngine.addDetector(failedTxDetector);
     
-    console.log('Built-in detectors loaded');
+    logger.info('Built-in detectors loaded');
   }
 
   private async loadPluginDetectors(): Promise<void> {
-    console.log('Loading plugin detectors...');
+    logger.info('Loading plugin detectors...');
     
     try {
       const pluginDetectors = await this.pluginLoader.loadAllPlugins();
@@ -69,9 +70,9 @@ class StellarGuardian {
         this.detectorEngine.addDetector(detector);
       }
       
-      console.log(`Loaded ${pluginDetectors.length} plugin detectors`);
+      logger.info(`Loaded ${pluginDetectors.length} plugin detectors`);
     } catch (error) {
-      console.error('Failed to load plugin detectors:', error);
+      logger.error('Failed to load plugin detectors:', error);
     }
   }
 
@@ -86,16 +87,16 @@ class StellarGuardian {
           }
         }
       } catch (error) {
-        console.error('Error processing contract event:', error);
+        logger.error('Error processing contract event:', error);
       }
     });
 
     this.ingestor.on('error', (error) => {
-      console.error('Ingestor error:', error);
+      logger.error('Ingestor error:', error);
     });
 
     this.ingestor.on('ledgerProcessed', (ledgerNumber) => {
-      console.log(`Processed ledger: ${ledgerNumber}`);
+      logger.info(`Processed ledger: ${ledgerNumber}`);
     });
   }
 
@@ -114,7 +115,7 @@ class StellarGuardian {
 
       await this.webhookService.sendAlert(payload.alertId, payload);
     } catch (error) {
-      console.error('Failed to send webhook alert:', error);
+      logger.error('Failed to send webhook alert:', error);
     }
   }
 
@@ -131,19 +132,19 @@ class StellarGuardian {
     
     const port = process.env.PORT || 3000;
     this.app.listen(port, () => {
-      console.log(`API server running on port ${port}`);
+      logger.info(`API server running on port ${port}`);
     });
 
-    console.log('Stellar Guardian monitoring Stellar network');
+    logger.info('Stellar Guardian monitoring Stellar network');
   }
 
   async stop(): Promise<void> {
-    console.log('Stopping Stellar Guardian...');
+    logger.info('Stopping Stellar Guardian...');
     
     await this.ingestor.stop();
     await this.prisma.$disconnect();
     
-    console.log('Stellar Guardian stopped');
+    logger.info('Stellar Guardian stopped');
   }
 }
 
@@ -151,7 +152,7 @@ if (require.main === module) {
   const guardian = new StellarGuardian();
   
   guardian.start().catch((error) => {
-    console.error('Failed to start Stellar Guardian:', error);
+    logger.error('Failed to start Stellar Guardian:', error);
     process.exit(1);
   });
 

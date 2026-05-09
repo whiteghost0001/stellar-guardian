@@ -1,3 +1,4 @@
+import logger from './logger';
 import { BaseDetector, DetectorRegistry, DetectorEngine } from './detector.interface';
 import { StellarEvent, DetectionResult, MonitoringMetrics } from './types';
 import { PrismaClient } from '@prisma/client';
@@ -7,12 +8,12 @@ export class DetectorRegistryImpl implements DetectorRegistry {
 
   register(detector: BaseDetector): void {
     this.detectors.set(detector.getName(), detector);
-    console.log(`Registered detector: ${detector.getName()}`);
+    logger.info(`Registered detector: ${detector.getName()}`);
   }
 
   unregister(detectorId: string): void {
     this.detectors.delete(detectorId);
-    console.log(`Unregistered detector: ${detectorId}`);
+    logger.info(`Unregistered detector: ${detectorId}`);
   }
 
   getDetector(detectorId: string): BaseDetector | undefined {
@@ -63,7 +64,7 @@ export class DetectorEngineImpl implements DetectorEngine {
         
         return result;
       } catch (error) {
-        console.error(`Detector ${detector.getName()} failed:`, error);
+        logger.error(`Detector ${detector.getName()} failed:`, error);
         await this.logDetectorExecution(detector.getName(), 'ERROR', 0, error);
         return null;
       }
@@ -119,7 +120,7 @@ export class DetectorEngineImpl implements DetectorEngine {
         }
       });
     } catch (logError) {
-      console.error('Failed to log detector execution:', logError);
+      logger.error('Failed to log detector execution:', logError);
     }
   }
 
@@ -136,16 +137,15 @@ export class DetectorEngineImpl implements DetectorEngine {
         }
       });
     } catch (error) {
-      console.error('Failed to store alert:', error);
+      logger.error('Failed to store alert:', error);
     }
   }
 
   private extractAlertType(title: string): string {
-    // Extract alert type from title
-    if (title.toLowerCase().includes('whale')) return 'WHALE_TRANSFER';
-    if (title.toLowerCase().includes('failed')) return 'FAILED_TRANSACTION';
-    if (title.toLowerCase().includes('suspicious')) return 'SUSPICIOUS_ACTIVITY';
-    return 'GENERAL';
+    if (title.toLowerCase().includes('whale')) return 'whale_transfer';
+    if (title.toLowerCase().includes('failed')) return 'failed_transaction';
+    if (title.toLowerCase().includes('suspicious')) return 'suspicious_activity';
+    return 'general';
   }
 
   private async getOrCreateContractEvent(event: StellarEvent): Promise<string> {
@@ -175,7 +175,7 @@ export class DetectorEngineImpl implements DetectorEngine {
 
       return contractEvent.id;
     } catch (error) {
-      console.error('Failed to create contract event:', error);
+      logger.error('Failed to create contract event:', error);
       throw error;
     }
   }

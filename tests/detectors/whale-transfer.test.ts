@@ -39,7 +39,7 @@ describe('WhaleTransferDetector', () => {
       expect(result).toBeTruthy();
       expect(result?.isMatch).toBe(true);
       expect(result?.severity).toBe('MEDIUM');
-      expect(result?.title).toContain('Whale Activity');
+      expect(result?.title).toContain('Large Transfer');
     });
 
     test('should detect large USDC transfer with HIGH severity', async () => {

@@ -1,10 +1,13 @@
+import logger from '../core/logger';
 import express from 'express';
 import { PrismaClient } from '@prisma/client';
 import { RiskScoringEngine } from '../core/risk-engine';
+import { WebhookService } from '../alerts/webhook-service';
 
 const router = express.Router();
 
 export function createDashboardAPI(prisma: PrismaClient, riskEngine: RiskScoringEngine) {
+  const webhookService = new WebhookService(prisma);
   
   router.get('/alerts', async (req, res) => {
     try {
@@ -177,6 +180,17 @@ export function createDashboardAPI(prisma: PrismaClient, riskEngine: RiskScoring
       });
     } catch (error) {
       res.status(500).json({ error: 'Failed to fetch statistics' });
+    }
+  });
+
+  router.post('/webhooks', async (req, res) => {
+    try {
+      const { url, secret, alertTypes } = req.body;
+      if (!url) return res.status(400).json({ error: 'url is required' });
+      const id = await webhookService.registerEndpoint(url, secret, alertTypes);
+      res.status(201).json({ id });
+    } catch (error) {
+      res.status(500).json({ error: 'Failed to register webhook' });
     }
   });
 

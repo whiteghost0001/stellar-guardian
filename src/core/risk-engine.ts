@@ -1,3 +1,4 @@
+import logger from './logger';
 import { PrismaClient } from '@prisma/client';
 import { RiskFactor } from './types';
 
@@ -44,14 +45,14 @@ export class RiskScoringEngine {
       },
       update: {
         score,
-        factors: factors,
+        factors: factors as any,
         lastUpdated: new Date()
       },
       create: {
         entityId,
         entityType,
         score,
-        factors: factors,
+        factors: factors as any,
         lastUpdated: new Date()
       }
     });
@@ -112,6 +113,16 @@ export class RiskScoringEngine {
       description: 'Code complexity analysis pending'
     });
 
+    if (contractData.largeTransferCount !== undefined && contractData.totalTransfers) {
+      const freq = contractData.largeTransferCount / contractData.totalTransfers;
+      factors.push({
+        type: 'large_transfer_frequency',
+        weight: 0.25,
+        value: freq,
+        description: `Large transfer frequency: ${(freq * 100).toFixed(1)}%`
+      });
+    }
+
     return factors;
   }
 
@@ -136,6 +147,25 @@ export class RiskScoringEngine {
         weight: 0.2,
         value: frequencyFactor,
         description: `Daily transactions: ${accountData.dailyTransactionCount}`
+      });
+    }
+
+    if (accountData.balanceVolatility !== undefined) {
+      factors.push({
+        type: 'balance_volatility',
+        weight: 0.25,
+        value: accountData.balanceVolatility,
+        description: `Balance volatility: ${(accountData.balanceVolatility * 100).toFixed(1)}%`
+      });
+    }
+
+    if (accountData.riskyContractInteractions !== undefined && accountData.totalInteractions) {
+      const ratio = accountData.riskyContractInteractions / accountData.totalInteractions;
+      factors.push({
+        type: 'risky_interactions',
+        weight: 0.25,
+        value: ratio,
+        description: `Risky contract interactions: ${(ratio * 100).toFixed(1)}%`
       });
     }
 

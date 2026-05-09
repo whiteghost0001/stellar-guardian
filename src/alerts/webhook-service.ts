@@ -1,3 +1,4 @@
+import logger from '../core/logger';
 import { WebhookPayload } from '../core/types';
 import { PrismaClient } from '@prisma/client';
 import crypto from 'crypto';
@@ -48,9 +49,9 @@ export class WebhookService {
         throw new Error(`HTTP ${response.status}: ${response.statusText}`);
       }
 
-      console.log(`Webhook sent to ${endpoint.url}`);
+      logger.info(`Webhook sent to ${endpoint.url}`);
     } catch (error) {
-      console.error(`Failed to send webhook to ${endpoint.url}:`, error);
+      logger.error(`Failed to send webhook to ${endpoint.url}:`, error);
     }
   }
 

@@ -11,7 +11,7 @@ describe('RiskScoringEngine', () => {
   beforeEach(() => {
     mockPrisma = {
       riskScore: {
-        upsert: jest.fn(),
+        upsert: jest.fn().mockResolvedValue({}),
         findUnique: jest.fn(),
         findMany: jest.fn(),
         count: jest.fn(),
@@ -33,7 +33,7 @@ describe('RiskScoringEngine', () => {
         { type: 'failures', weight: 0.3, value: 0.5, description: 'Some failures' }
       ];
 
-      mockPrisma.riskScore.upsert.mockResolvedValue({
+      (mockPrisma.riskScore.upsert as jest.Mock).mockResolvedValue({
         id: 'risk1',
         entityId: 'CONTRACT123',
         entityType: 'CONTRACT',
@@ -44,8 +44,8 @@ describe('RiskScoringEngine', () => {
 
       const score = await riskEngine.calculateRiskScore('CONTRACT123', 'CONTRACT', factors);
 
-      // Expected: (0.8*0.3 + 0.2*0.4 + 0.5*0.3) * 100 = 46
-      expect(score).toBe(46);
+      // Expected: (0.8*0.3 + 0.2*0.4 + 0.5*0.3) / (0.3+0.4+0.3) * 100 = 47
+      expect(score).toBe(47);
       expect(mockPrisma.riskScore.upsert).toHaveBeenCalledWith({
         where: {
           entityId_entityType: {
@@ -54,14 +54,14 @@ describe('RiskScoringEngine', () => {
           }
         },
         update: {
-          score: 46,
+          score: 47,
           factors: factors,
           lastUpdated: expect.any(Date)
         },
         create: {
           entityId: 'CONTRACT123',
           entityType: 'CONTRACT',
-          score: 46,
+          score: 47,
           factors: factors,
           lastUpdated: expect.any(Date)
         }
@@ -69,7 +69,7 @@ describe('RiskScoringEngine', () => {
     });
 
     test('should handle empty factors', async () => {
-      mockPrisma.riskScore.upsert.mockResolvedValue({
+      (mockPrisma.riskScore.upsert as jest.Mock).mockResolvedValue({
         id: 'risk2',
         entityId: 'CONTRACT456',
         entityType: 'CONTRACT',
@@ -87,7 +87,7 @@ describe('RiskScoringEngine', () => {
         { type: 'high_risk', weight: 1.0, value: 2.0, description: 'Very high risk' }
       ];
 
-      mockPrisma.riskScore.upsert.mockResolvedValue({
+      (mockPrisma.riskScore.upsert as jest.Mock).mockResolvedValue({
         id: 'risk3',
         entityId: 'CONTRACT789',
         entityType: 'CONTRACT',

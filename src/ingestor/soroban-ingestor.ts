@@ -1,43 +1,44 @@
-import { Server, Horizon } from '@stellar/stellar-sdk';
+import logger from '../core/logger';
+import { Horizon } from '@stellar/stellar-sdk';
 import { StellarEvent, SorobanRPCResponse } from '../core/types';
 import { EventEmitter } from 'events';
 
 export class SorobanIngestor extends EventEmitter {
-  private server: Server;
+  private server: Horizon.Server;
   private rpcUrl: string;
-  private isRunning: boolean = false;
+  private running: boolean = false;
   private currentLedger: number = 0;
 
   constructor(horizonUrl: string, rpcUrl: string) {
     super();
-    this.server = new Server(horizonUrl);
+    this.server = new Horizon.Server(horizonUrl);
     this.rpcUrl = rpcUrl;
   }
 
   async start(): Promise<void> {
-    if (this.isRunning) {
+    if (this.running) {
       throw new Error('Ingestor already running');
     }
 
-    this.isRunning = true;
-    console.log('Starting Soroban ingestor...');
+    this.running = true;
+    logger.info('Starting Soroban ingestor...');
 
     try {
       this.currentLedger = await this.getCurrentLedger();
-      console.log(`Starting from ledger: ${this.currentLedger}`);
+      logger.info(`Starting from ledger: ${this.currentLedger}`);
 
       await this.startLedgerStream();
       
     } catch (error) {
-      console.error('Failed to start ingestor:', error);
-      this.isRunning = false;
+      logger.error('Failed to start ingestor:', error);
+      this.running = false;
       throw error;
     }
   }
 
   async stop(): Promise<void> {
-    this.isRunning = false;
-    console.log('Soroban ingestor stopped');
+    this.running = false;
+    logger.info('Soroban ingestor stopped');
   }
 
   private async getCurrentLedger(): Promise<number> {
@@ -52,10 +53,10 @@ export class SorobanIngestor extends EventEmitter {
         })
       });
 
-      const data: SorobanRPCResponse = await response.json();
+      const data = await response.json() as SorobanRPCResponse;
       return data.result?.sequence || 0;
     } catch (error) {
-      console.error('Failed to get current ledger:', error);
+      logger.error('Failed to get current ledger:', error);
       return 0;
     }
   }
@@ -64,9 +65,9 @@ export class SorobanIngestor extends EventEmitter {
     const ledgerStream = this.server.ledgers()
       .cursor('now')
       .stream({
-        onmessage: (ledger) => this.processLedger(ledger),
-        onerror: (error) => {
-          console.error('Ledger stream error:', error);
+        onmessage: (ledger: any) => this.processLedger(ledger),
+        onerror: (error: any) => {
+          logger.error('Ledger stream error:', error);
           this.emit('error', error);
         }
       });
@@ -74,7 +75,7 @@ export class SorobanIngestor extends EventEmitter {
 
   private async processLedger(ledger: any): Promise<void> {
     try {
-      console.log(`Processing ledger ${ledger.sequence}`);
+      logger.info(`Processing ledger ${ledger.sequence}`);
       
       const transactions = await this.getLedgerTransactions(ledger.sequence);
       
@@ -86,7 +87,7 @@ export class SorobanIngestor extends EventEmitter {
       this.emit('ledgerProcessed', ledger.sequence);
       
     } catch (error) {
-      console.error(`Error processing ledger ${ledger.sequence}:`, error);
+      logger.error(`Error processing ledger ${ledger.sequence}:`, error);
       this.emit('error', error);
     }
   }
@@ -99,7 +100,7 @@ export class SorobanIngestor extends EventEmitter {
       
       return transactions.records;
     } catch (error) {
-      console.error(`Failed to get transactions for ledger ${ledgerSequence}:`, error);
+      logger.error(`Failed to get transactions for ledger ${ledgerSequence}:`, error);
       return [];
     }
   }
@@ -117,7 +118,7 @@ export class SorobanIngestor extends EventEmitter {
       }
       
     } catch (error) {
-      console.error(`Error processing transaction ${transaction.id}:`, error);
+      logger.error(`Error processing transaction ${transaction.id}:`, error);
     }
   }
 
@@ -141,7 +142,7 @@ export class SorobanIngestor extends EventEmitter {
       }
       
     } catch (error) {
-      console.error(`Failed to extract events from transaction ${transaction.id}:`, error);
+      logger.error(`Failed to extract events from transaction ${transaction.id}:`, error);
     }
     
     return events;
@@ -171,7 +172,7 @@ export class SorobanIngestor extends EventEmitter {
       }
       
     } catch (error) {
-      console.error(`Failed to parse contract operation:`, error);
+      logger.error(`Failed to parse contract operation:`, error);
     }
     
     return events;
@@ -201,7 +202,7 @@ export class SorobanIngestor extends EventEmitter {
         blockHash: ledger.hash
       };
     } catch (error) {
-      console.error('Failed to parse contract invocation:', error);
+      logger.error('Failed to parse contract invocation:', error);
       return null;
     }
   }
@@ -225,7 +226,7 @@ export class SorobanIngestor extends EventEmitter {
         blockHash: ledger.hash
       };
     } catch (error) {
-      console.error('Failed to parse contract creation:', error);
+      logger.error('Failed to parse contract creation:', error);
       return null;
     }
   }
@@ -235,7 +236,7 @@ export class SorobanIngestor extends EventEmitter {
   }
 
   isRunning(): boolean {
-    return this.isRunning;
+    return this.running;
   }
 
   // TODO: implement historical event querying

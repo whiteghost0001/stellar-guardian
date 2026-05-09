@@ -1,3 +1,4 @@
+import logger from '../core/logger';
 import { BaseDetector } from '../core/detector.interface';
 import { StellarEvent, DetectionResult, DetectorConfig } from '../core/types';
 
@@ -50,7 +51,7 @@ export class WhaleTransferDetector extends BaseDetector {
         }
       };
     } catch (error) {
-      console.error(`Error processing whale transfer event: ${error}`);
+      logger.error(`Error processing whale transfer event: ${error}`);
       return null;
     }
   }
