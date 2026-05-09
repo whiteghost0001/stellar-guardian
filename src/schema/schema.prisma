@@ -1,0 +1,148 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model ContractEvent {
+  id            String   @id @default(cuid())
+  contractId    String
+  eventType     String
+  eventData     Json
+  transactionId String
+  ledgerNumber  Int
+  timestamp     DateTime
+  blockHash     String
+  
+  // Relations
+  alerts        SecurityAlert[]
+  
+  @@index([contractId])
+  @@index([eventType])
+  @@index([timestamp])
+  @@index([ledgerNumber])
+  @@map("contract_events")
+}
+
+model SecurityAlert {
+  id          String      @id @default(cuid())
+  severity    AlertSeverity
+  alertType   String
+  title       String
+  description String
+  metadata    Json
+  status      AlertStatus @default(ACTIVE)
+  
+  // Relations
+  contractEventId String?
+  contractEvent   ContractEvent? @relation(fields: [contractEventId], references: [id])
+  riskScoreId     String?
+  riskScore       RiskScore?     @relation(fields: [riskScoreId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([severity])
+  @@index([alertType])
+  @@index([status])
+  @@index([createdAt])
+  @@map("security_alerts")
+}
+
+model WatchedContract {
+  id          String   @id @default(cuid())
+  contractId  String   @unique
+  name        String?
+  description String?
+  tags        String[]
+  isActive    Boolean  @default(true)
+  
+  // Monitoring configuration
+  monitorEvents     Boolean @default(true)
+  monitorTransfers  Boolean @default(true)
+  alertThresholds   Json    // Custom thresholds for this contract
+  
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  
+  @@index([contractId])
+  @@index([isActive])
+  @@map("watched_contracts")
+}
+
+model RiskScore {
+  id           String   @id @default(cuid())
+  entityId     String   // Contract ID or Account ID
+  entityType   EntityType
+  score        Float    // 0-100 risk score
+  factors      Json     // Risk factors that contributed to score
+  lastUpdated  DateTime @default(now())
+  
+  // Relations
+  alerts       SecurityAlert[]
+  
+  @@unique([entityId, entityType])
+  @@index([score])
+  @@index([entityType])
+  @@index([lastUpdated])
+  @@map("risk_scores")
+}
+
+model DetectorLog {
+  id          String      @id @default(cuid())
+  detectorId  String
+  status      DetectorStatus
+  message     String?
+  executionTime Int?      // milliseconds
+  errorDetails Json?
+  
+  createdAt   DateTime @default(now())
+  
+  @@index([detectorId])
+  @@index([status])
+  @@index([createdAt])
+  @@map("detector_logs")
+}
+
+model WebhookEndpoint {
+  id          String   @id @default(cuid())
+  url         String
+  secret      String?
+  isActive    Boolean  @default(true)
+  alertTypes  String[] // Which alert types to send
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  
+  @@index([isActive])
+  @@map("webhook_endpoints")
+}
+
+enum AlertSeverity {
+  LOW
+  MEDIUM
+  HIGH
+  CRITICAL
+}
+
+enum AlertStatus {
+  ACTIVE
+  ACKNOWLEDGED
+  RESOLVED
+  FALSE_POSITIVE
+}
+
+enum EntityType {
+  CONTRACT
+  ACCOUNT
+}
+
+enum DetectorStatus {
+  SUCCESS
+  ERROR
+  TIMEOUT
+  SKIPPED
+}

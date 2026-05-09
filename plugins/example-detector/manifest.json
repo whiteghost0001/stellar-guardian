@@ -1,0 +1,17 @@
+{
+  "name": "example-detector",
+  "version": "1.0.0",
+  "description": "Example detector plugin",
+  "author": "dev team",
+  "detectors": [{
+    "id": "example-detector",
+    "name": "Example Detector",
+    "description": "Basic example detector",
+    "enabled": true,
+    "parameters": {
+      "threshold": 1000,
+      "monitoredEvents": ["transfer", "contract_invocation"],
+      "alertCooldown": 300000
+    }
+  }]
+}
